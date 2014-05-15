@@ -13,6 +13,12 @@ app.get('/', function (req, res) {
 var usernames = {};
 var log = [];
 
+io.configure(function () {
+  io.set("transports", ["xhr-polling"]);
+  io.set("polling duration", 10);
+});
+
+
 io.sockets.on('connection', function (socket) {
 
     // when the client emits 'sendchat', this listens and executes
