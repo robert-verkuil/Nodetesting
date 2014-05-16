@@ -2,16 +2,30 @@ var app = require('express')()
   , server = require('http').createServer(app)
   , io = require('socket.io').listen(server);
 
-server.listen(process.env.PORT || 8080);
+//server.listen(process.env.PORT); //8080
+server.listen(5000);
+
+var SerialPort = require("serialport").SerialPort
+var serialPort = new SerialPort("/dev/tty.usbmodem14431", {
+  baudrate: 9600
+});
+
+serialPort.open(function () {
+  console.log('open');
+});
 
 // routing
 app.get('/', function (req, res) {
   res.sendfile(__dirname + '/index.html');
 });
 
+app.get('/homeautomation', function (req, res) {
+  res.sendfile(__dirname + '/homeautomation.html');
+});
+
 // usernames which are currently connected to the chat
 var usernames = {};
-var log = [];
+var convolog = [];
 
 io.configure(function () {
   io.set("transports", ["xhr-polling"]);
@@ -21,38 +35,69 @@ io.configure(function () {
 
 io.sockets.on('connection', function (socket) {
 
-    // when the client emits 'sendchat', this listens and executes
+    socket.on('passsend', function (data) {
+        if (data == "fido"){
+            socket.emit("correct");
+        } else {
+            socket.emit("incorrect");
+            console.log("bad password");
+        }
+    });
+
+    socket.on('onred', function () {
+        console.log("onred");
+        serialPort.write('0', function(err, results) {
+            console.log('err ' + err);
+            console.log('results ' + results);
+        });
+    });
+
+    socket.on('offred', function () {
+        console.log("offred");
+        serialPort.write("1", function(err, results) {
+            console.log('err ' + err);
+            console.log('results ' + results);
+        });
+    });
+
+    socket.on('ongreen', function () {
+        console.log("ongreen");
+        serialPort.write("2", function(err, results) {
+            console.log('err ' + err);
+            console.log('results ' + results);
+        });
+    });
+
+    socket.on('offgreen', function () {
+        console.log("offgreen");
+        serialPort.write("3", function(err, results) {
+            console.log('err ' + err);
+            console.log('results ' + results);
+        });
+    });
+
+
     socket.on('sendchat', function (data) {
-        // we tell the client to execute 'updatechat' with 2 parameters
+
         io.sockets.emit('updatechat', socket.username, data);
-        log.push(data);
+        convolog.push(data);
     });
 
-    // when the client emits 'adduser', this listens and executes
     socket.on('adduser', function(username){
-        // we store the username in the socket session for this client
         socket.username = username;
-        // add the client's username to the global list
         usernames[username] = username;
-        // echo to client they've connected
         socket.emit('updatechat', 'SERVER', 'you have connected');
-        // echo globally (all clients) that a person has connected
         socket.broadcast.emit('updatechat', 'SERVER', username + ' has connected');
-        // update the list of users in chat, client-side
         io.sockets.emit('updateusers', usernames);
     });
 
-    // when the user disconnects.. perform this
     socket.on('disconnect', function(){
-        // remove the username from global usernames list
         delete usernames[socket.username];
-        // update list of users in chat, client-side
         io.sockets.emit('updateusers', usernames);
-        // echo globally that this client has left
         socket.broadcast.emit('updatechat', 'SERVER', socket.username + ' has disconnected');
     });
 
     socket.on('sendlog', function(){
-        socket.emit('hereslog', log);
+        socket.emit('hereslog', convolog);
     });
 });
